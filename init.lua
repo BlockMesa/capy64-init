@@ -58,7 +58,7 @@ fakeGlobals.settings = fakeSettings
 
 --FS
 local fakeFs = require("fs")
-fakeGlobals.fs = fakeFs
+
 
 --COLORS
 local defaultColors = {}
@@ -145,6 +145,7 @@ local function blitTransform(ccBlit)
 	return newBlit
 end
 local fakeTerm = require("term")
+local sizeX,sizeY = fakeTerm.getSize()
 local oldBlit = fakeTerm.blit
 fakeTerm.native = blank
 fakeTerm.redirect = blank
@@ -174,6 +175,55 @@ fakeTerm.blit = function(txt,fore,back)
 end
 fakeGlobals.term = fakeTerm
 
+--FILESYSTEM
+local readModes = {
+	["r"] = true,
+	["rb"] = true
+}
+local writeModes = {
+	["w"] = true,
+	["wb"] = true,
+	["a"] = true,
+	["ab"] = true
+}
+local fakeFs = require("fs")
+local oldOpen = fakeFs.open
+fakeFs.open = function(file,mode)
+	if not readModes[mode] and not writeModes[mode] then
+		error("invalid mode!",0)
+	else
+		local a = oldOpen(file,mode)
+		if readModes[mode] then
+			return {
+				readAll = function(...)
+					local str = ""
+					local last = ""
+					while last do
+						last = a:read()
+						if last then
+							str = str..last
+						end
+					end
+					return str
+				end,
+				readLine = function(...) return a:readLine(...) end,
+				read = function(...) return a:read(...) end,
+				close = function(...) return a:close(...) end,
+			}
+		elseif writeModes[mode] then
+			return {
+				write = function(...) return a:write(...) end,
+				writeLine = function(...) return a:writeLine(...) end,
+				flush = function(...) return a:flush(...) end,
+				close = function(...) return a:close(...) end,
+			}
+		else
+			error("wtf")
+		end
+	end
+end
+fakeGlobals.fs = fakeFs
+
 --GLOBALS
 local oldPrint = print
 fakeGlobals.print = function(str)
@@ -181,13 +231,52 @@ fakeGlobals.print = function(str)
 	term.setBackground(term.getBackground())
 	term.write(str)
 	local _,y = term.getPos()
-	term.setPos(1,y+1)
+	if y+1 > sizeY then
+		term.scroll(1)
+		term.setPos(1,sizeY)
+	else
+		term.setPos(1,y+1)
+	end
 end
 fakeGlobals.sleep = fakeOs.sleep 
+fakeGlobals.read = function(hideChar)
+	local continue = true
+	local str = ""
+	local x,y = term.getPos()
+	while continue do
+		local a,b,c = event.pull("char","key_down")
+		if a == "char" then
+			term.write(b)
+			str = str..b
+			x = x + 1
+		else
+			if c == "enter" then
+				continue = false
+			elseif c == "back" then
+				if str ~= "" then
+					str = str:sub(1, -2)
+					x = x - 1
+					term.setPos(x,y)
+					term.write(" ")
+					term.setPos(x,y)
+				end
+			end
+		end
+	end
+	
+	if y+1 > sizeY then
+		term.scroll(1)
+		term.setPos(1,sizeY)
+	else
+		term.setPos(1,y+1)
+	end
+	return str
+end
 
 --CONFIG
 local compat = {}
 compat.isCapy64 = true
+compat.makeRequire = function(...) return require, package end
 compat.version = "v0.1"
 fakeGlobals.compat = compat
 for i,v in pairs(fakeGlobals) do
