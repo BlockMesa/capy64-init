@@ -2,6 +2,7 @@
 --TODO: implement all basic CC functions BM-BIOS uses
 local machine = require("machine")
 local event = require("event")
+local machine = require("machine")
 local timer = require("timer")
 local blank = function(...) return end
 local fakeGlobals = {}
@@ -184,6 +185,11 @@ fakeTerm.blit = function(txt,fore,back)
 end
 fakeGlobals.term = fakeTerm
 
+--WINDOW
+local fakeWindow = {}
+fakeWindow.create = function(...) return fakeTerm end
+fakeGlobals.window = fakeWindow
+
 --FILESYSTEM
 local readModes = {
 	["r"] = true,
@@ -231,6 +237,7 @@ fakeFs.open = function(file,mode)
 		end
 	end
 end
+fakeFs.find = function(...) return {} end
 fakeGlobals.fs = fakeFs
 
 --GLOBALS
@@ -302,7 +309,12 @@ end
 local compat = {}
 compat.isCapy64 = true
 compat.makeRequire = function(...) return require, package end
-compat.version = "v0.1"
+compat.version = "v0.2"
+compat.title = machine.title
+compat.setRPC = machine.setRPC
+compat.log = function(...)
+	oldPrint(...)
+end
 fakeGlobals.compat = compat
 for i,v in pairs(fakeGlobals) do
 	if _G[i] and type(v) == "table" then
