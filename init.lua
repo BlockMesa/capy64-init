@@ -150,12 +150,14 @@ local oldBlit = fakeTerm.blit
 fakeTerm.native = function()
     return fakeTerm
 end -- according to the CC code (and documentation) this is what term.native does when not multitasking, we dont really care about cc multitasking
-fakeTerm.redirect = function(target)
-    expect(1, target, "table")
-    local oldRedirectTarget = fakeTerm
-    fakeTerm = target
-    return oldRedirectTarget
-end --modified CC code
+fakeTerm.redirect = function(new)
+	if not new then
+		error("New terminal required!",0)
+	end
+	local oldTerm = fakeTerm
+	fakeTerm = new
+	return oldTerm
+end
 fakeTerm.setBackgroundColor = fakeTerm.setBackground 
 fakeTerm.setBackgroundColour = fakeTerm.setBackground 
 fakeTerm.getBackgroundColor = fakeTerm.getBackground
