@@ -188,6 +188,7 @@ fakeGlobals.sleep = fakeOs.sleep
 --CONFIG
 local compat = {}
 compat.isCapy64 = true
+compat.version = "v0.1"
 fakeGlobals.compat = compat
 for i,v in pairs(fakeGlobals) do
 	if _G[i] and type(v) == "table" then
@@ -199,4 +200,6 @@ for i,v in pairs(fakeGlobals) do
 	end
 end
 
+machine.title("bios-wrapper "..compat.version)
+machine.setRPC("bios-wrapper "..compat.version, "")
 os.run({},"/.BIOS")
