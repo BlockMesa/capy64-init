@@ -272,6 +272,22 @@ fakeGlobals.read = function(hideChar)
 	end
 	return str
 end
+local oldDoFile = dofile
+local badFiles = {
+	["rom/modules/main/cc/require.lua"] = true,
+	["/rom/modules/main/cc/require.lua"] = true
+}
+fakeGlobals.dofile = function(file)
+	if badFiles[file] then
+		local fake = {}
+		fake.make = function(...)
+			return require, package
+		end
+		return fake
+	else
+		return dofile(file)
+	end
+end
 
 --CONFIG
 local compat = {}
