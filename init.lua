@@ -147,8 +147,15 @@ end
 local fakeTerm = require("term")
 local sizeX,sizeY = fakeTerm.getSize()
 local oldBlit = fakeTerm.blit
-fakeTerm.native = blank
-fakeTerm.redirect = blank
+fakeTerm.native = function()
+    return fakeTerm
+end -- according to the CC code (and documentation) this is what term.native does when not multitasking, we dont really care about cc multitasking
+fakeTerm.redirect = function(target)
+    expect(1, target, "table")
+    local oldRedirectTarget = fakeTerm
+    fakeTerm = target
+    return oldRedirectTarget
+end --modified CC code
 fakeTerm.setBackgroundColor = fakeTerm.setBackground 
 fakeTerm.setBackgroundColour = fakeTerm.setBackground 
 fakeTerm.getBackgroundColor = fakeTerm.getBackground
