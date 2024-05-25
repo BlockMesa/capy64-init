@@ -57,10 +57,6 @@ end
 fakeSettings.save = blank
 fakeGlobals.settings = fakeSettings
 
---FS
-local fakeFs = require("fs")
-
-
 --COLORS
 local defaultColors = {}
 defaultColors[fakeMath.pow(2,0)] = 0xF0F0F0
@@ -242,17 +238,43 @@ fakeGlobals.fs = fakeFs
 
 --GLOBALS
 local oldPrint = print
-fakeGlobals.print = function(str)
-	oldPrint(str)
-	term.setBackground(term.getBackground())
-	term.write(str)
-	local _,y = term.getPos()
+local writeLine = function(line)
+	local x,y = term.getPos()
+	term.write(line)
 	if y+1 > sizeY then
 		term.scroll(1)
 		term.setPos(1,sizeY)
 	else
 		term.setPos(1,y+1)
 	end
+end
+fakeGlobals.print = function(str)
+	oldPrint(str)
+	local chars = {}
+	local lines = {}
+	for i in string.gmatch(str, ".") do
+		table.insert(chars, i)
+	end
+	local x,y = term.getPos()
+	local currentLine = 1
+	local currentCharacter = x
+	for i,v in pairs(chars) do
+		if currentCharacter > sizeX or v == "\n" then
+			currentLine = currentLine + 1
+			currentCharacter = 1
+		end
+		if v ~= "\n" then
+			if not lines[currentLine] then
+				lines[currentLine] = ""
+			end
+			lines[currentLine] = lines[currentLine]..v
+			currentCharacter = currentCharacter + 1
+		end
+	end
+	for i,v in pairs(lines) do
+		writeLine(v)
+	end	
+
 end
 fakeGlobals.sleep = fakeOs.sleep 
 fakeGlobals.read = function(hideChar)
