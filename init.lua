@@ -4,6 +4,9 @@ local machine = require("machine")
 local event = require("event")
 local machine = require("machine")
 local timer = require("timer")
+local http = require("http")
+local json = require("lib.json")
+
 local blank = function(...) return end
 local fakeGlobals = {}
 
@@ -197,6 +200,45 @@ local writeModes = {
 	["a"] = true,
 	["ab"] = true
 }
+local makeReadHandle = function(a)
+	return {
+		readAll = function(...) return a:read("a") end,
+		readLine = function(...) return a:readLine("l") end,
+		read = function(...) return a:read(...) end,
+		close = function(...) return a:close(...) end,
+	}
+end
+local makeWriteHandle = function(a)
+	return {
+		write = function(str) 
+			--[[local lines = {}
+			local chars = {}
+			for i in string.gmatch(str, ".") do
+				table.insert(chars, i)
+			end
+			currentLine = 1
+			for i,v in pairs(chars) do
+				if v == "\n" then
+					currentLine = currentLine + 1
+				end
+				if v ~= "\n" then
+					if not lines[currentLine] then
+						lines[currentLine] = ""
+					end
+					lines[currentLine] = lines[currentLine]..v
+				end
+			end
+			for i,v in pairs(lines) do
+				a:writeLine(v)
+			end
+			return]]
+			return a:write(str) 
+		end,
+		writeLine = function(...) return a:writeLine(...) end,
+		flush = function(...) return a:flush(...) end,
+		close = function(...) return a:close(...) end,
+	}
+end
 local fakeFs = require("fs")
 local oldOpen = fakeFs.open
 fakeFs.open = function(file,mode)
@@ -205,29 +247,9 @@ fakeFs.open = function(file,mode)
 	else
 		local a = oldOpen(file,mode)
 		if readModes[mode] then
-			return {
-				readAll = function(...)
-					local str = ""
-					local last = ""
-					while last do
-						last = a:read()
-						if last then
-							str = str..last
-						end
-					end
-					return str
-				end,
-				readLine = function(...) return a:readLine(...) end,
-				read = function(...) return a:read(...) end,
-				close = function(...) return a:close(...) end,
-			}
+			return makeReadHandle(a)
 		elseif writeModes[mode] then
-			return {
-				write = function(...) return a:write(...) end,
-				writeLine = function(...) return a:writeLine(...) end,
-				flush = function(...) return a:flush(...) end,
-				close = function(...) return a:close(...) end,
-			}
+			return makeWriteHandle(a)
 		else
 			error("wtf")
 		end
@@ -235,6 +257,43 @@ fakeFs.open = function(file,mode)
 end
 fakeFs.find = function(...) return {} end
 fakeGlobals.fs = fakeFs
+
+--HTTP
+local fakeHttp = {}
+fakeHttp.get = function(url,headers,options)
+	if type(url) == "table" then
+		local tab = url
+		url = tab.url
+		if not options then
+			options = {}
+		end
+		if tab.binary then
+			options.binary = true
+		end
+	elseif not url or type(url) ~= "string" then
+		error("Invalid URL!",0)
+	end
+	local c<close> = http.requestAsync(url,nil,headers,options)
+	local a,b = c:await()
+	for i,v in pairs(a) do
+		compat.log(i,v)
+	end
+	if not a then
+		return nil,b
+	else
+		return makeReadHandle(a.content)
+	end
+end
+fakeHttp.checkURL = http.checkURL
+fakeGlobals.http = fakeHttp
+
+--TEXTUTILS
+local fakeTextUtils = {}
+fakeTextUtils.serializeJSON = json.encode
+fakeTextUtils.serialiseJSON = json.encode
+fakeTextUtils.unserializeJSON = json.decode
+fakeTextUtils.unserialiseJSON = json.decode
+fakeGlobals.textutils = fakeTextUtils
 
 --GLOBALS
 local oldPrint = print
@@ -323,7 +382,7 @@ fakeGlobals.dofile = function(file)
 		end
 		return fake
 	else
-		return dofile(file)
+		return os.run({},file)
 	end
 end
 
@@ -331,7 +390,7 @@ end
 local compat = {}
 compat.isCapy64 = true
 compat.makeRequire = function(...) return require, package end
-compat.version = "v0.2"
+compat.version = "v0.3"
 compat.title = machine.title
 compat.setRPC = machine.setRPC
 compat.log = function(...)
