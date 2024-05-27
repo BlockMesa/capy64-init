@@ -86,6 +86,14 @@ for i,v in pairs(b3.files) do
     installFile(baseUrl3..v,v)
 end
 print("Installing package manager")
+for i,v in pairs(c.packages["bios-wrapper"].files) do
+    installFile(c.packages["bios-wrapper"].assetBase..v,v)
+end
+print("Installing BIOS manager")
+for i,v in pairs(c.packages.bios.files) do
+    installFile(c.packages.bios.assetBase..v,v)
+end
+print("Installing package manager")
 for i,v in pairs(b4.files) do
     installFile(baseUrl4..v,v)
 end
@@ -93,8 +101,6 @@ print("Installing base commands")
 for i,v in pairs(b.files) do
     installFile(baseUrl..v,v)
 end
-installFile(c.packages.bios.assetBase..".BIOS",".BIOS")
-installFile(c.packages["bios-wrapper"].assetBase.."init.lua","init.lua")
 fs.delete("sys",true)
 print("Installation complete!")
 machine.reboot()
