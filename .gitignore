@@ -1,3 +1,6 @@
 *
+!lib/bit.lua
+!lib/json.lua
 !.gitignore
 !init.lua
+!install.lua
