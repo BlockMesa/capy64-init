@@ -1,11 +1,13 @@
 --capy64 BM-BIOS wrapper
 --TODO: implement all basic CC functions BM-BIOS uses
+package.path = "./?.lua;./?/init.lua;/lib/?.lua;/lib/?/init.lua"
 local machine = require("machine")
 local event = require("event")
 local machine = require("machine")
 local timer = require("timer")
 local http = require("http")
-local json = require("lib.json")
+local json = require("json")
+local libFolder = "/lib"
 
 local blank = function(...) return end
 local fakeGlobals = {}
@@ -17,7 +19,7 @@ fakeOs.run = function(env,file)
 	for i,v in pairs(_G) do
 		newEnv[i] = v
 	end
-		for i,v in pairs(env) do
+	for i,v in pairs(env) do
 		newEnv[i] = v
 	end
 	local a = assert(loadfile(file,"bt",newEnv))
@@ -45,20 +47,6 @@ fakeMath.pow = function(a,b)
 	return a^b
 end
 fakeGlobals.math = fakeMath
-
---SETTINGS
-local values = {
-	["bm-bios.firstBoot"] = true
-}
-local fakeSettings = {}
-fakeSettings.get = function(name)
-	return values[name]
-end
-fakeSettings.set = function(name,val)
-	values[name] = val
-end
-fakeSettings.save = blank
-fakeGlobals.settings = fakeSettings
 
 --COLORS
 local defaultColors = {}
@@ -169,6 +157,8 @@ fakeTerm.setCursorBlink = fakeTerm.setBlink
 fakeTerm.getCursorBlink = fakeTerm.getBlink
 fakeTerm.setCursorPos = fakeTerm.setPos
 fakeTerm.getCursorPos = fakeTerm.getPos
+fakeTerm.isColor = function() return true end
+fakeTerm.isColour = fakeTerm.isColor
 fakeTerm.nativePaletteColor = function(color)
 	return defaultColors[color]
 end
@@ -245,18 +235,73 @@ fakeFs.open = function(file,mode)
 	if not readModes[mode] and not writeModes[mode] then
 		error("invalid mode!",0)
 	else
-		local a = oldOpen(file,mode)
-		if readModes[mode] then
-			return makeReadHandle(a)
-		elseif writeModes[mode] then
-			return makeWriteHandle(a)
+		local success, response = pcall(function()
+			local a = oldOpen(file,mode)
+			if readModes[mode] then
+				return makeReadHandle(a)
+			elseif writeModes[mode] then
+				return makeWriteHandle(a)
+			else
+				error("wtf")
+			end
+		end)
+		if not success then
+			compat.log(file)
+			error(response)
 		else
-			error("wtf")
+			return response
 		end
+		
 	end
 end
 fakeFs.find = function(...) return {} end
 fakeGlobals.fs = fakeFs
+
+--SETTINGS
+local values = {
+	["bm-bios.firstBoot"] = true,
+	["bios.use_multishell"] = false
+}
+local fakeSettings = {}
+fakeSettings.get = function(name)
+	return values[name]
+end
+fakeSettings.set = function(name,val)
+	values[name] = val
+end
+fakeSettings.save = function(file)
+	local success = pcall(function()
+		if not file then
+			file = "/.settings"
+		end
+		local a = fs.open(file,"w")
+		a.write(json.encode(values))
+		a.close()
+	end)
+
+	return success
+end
+fakeSettings.define = function(value,tab)
+	if not values[value] then
+		values[value] = tab.default
+	end
+end
+fakeSettings.load = function(file)
+	local success = pcall(function()
+		if not file then
+			file = "/.settings"
+		end
+		local a = fs.open(file,"r")
+		local b = json.decode(a.readAll())
+		a.close()
+		for i,v in pairs(b) do
+			values[i] = v
+		end
+	end)
+	
+	return success
+end
+fakeGlobals.settings = fakeSettings
 
 --HTTP
 local fakeHttp = {}
@@ -295,6 +340,9 @@ fakeTextUtils.unserializeJSON = json.decode
 fakeTextUtils.unserialiseJSON = json.decode
 fakeGlobals.textutils = fakeTextUtils
 
+--BIT32
+local fakeBit32 = require("lib.bit").bit32
+fakeGlobals.bit32 = fakeBit32
 --GLOBALS
 local oldPrint = print
 local writeLine = function(line)
@@ -336,6 +384,7 @@ fakeGlobals.print = function(str)
 
 end
 fakeGlobals.sleep = fakeOs.sleep 
+fakeGlobals.loadstring = load
 fakeGlobals.read = function(hideChar)
 	local continue = true
 	local str = ""
@@ -369,10 +418,46 @@ fakeGlobals.read = function(hideChar)
 	end
 	return str
 end
+fakeGlobals.expect = function(...) return end
+fakeGlobals.field = function(...) return end
+fakeGlobals.wrap = function(str)
+	local chars = {}
+	local lines = {}
+	for i in string.gmatch(str, ".") do
+		table.insert(chars, i)
+	end
+	local x,y = term.getPos()
+	local currentLine = 1
+	local currentCharacter = x
+	for i,v in pairs(chars) do
+		if currentCharacter > sizeX or v == "\n" then
+			currentLine = currentLine + 1
+			currentCharacter = 1
+		end
+		if v ~= "\n" then
+			if not lines[currentLine] then
+				lines[currentLine] = ""
+			end
+			lines[currentLine] = lines[currentLine]..v
+			currentCharacter = currentCharacter + 1
+		end
+	end
+	local returnString = ""
+	for i,v in pairs(lines) do
+		if i == 1 then
+			returnString=v
+		else
+			returnString=returnString.."\n"..v
+		end
+	end	
+	return returnString
+end
 local oldDoFile = dofile
 local badFiles = {
-	["rom/modules/main/cc/require.lua"] = true,
-	["/rom/modules/main/cc/require.lua"] = true
+	["/rom/modules/main/cc/require.lua"] = true,
+	["/rom/modules/main/cc/require.lua"] = true,
+	["/rom/modules/main/cc/expect.lua"] = true,
+	["/rom/modules/main/cc/expect.lua"] = true,
 }
 fakeGlobals.dofile = function(file)
 	if badFiles[file] then
@@ -380,11 +465,26 @@ fakeGlobals.dofile = function(file)
 		fake.make = function(...)
 			return require, package
 		end
+		fake.expect = function(...) return end
+		fake.field = function(...) return end
 		return fake
 	else
-		return os.run({},file)
+		return oldDoFile(file)
 	end
 end
+local oldRequire = require
+--[[fakeGlobals.require = function(str)
+	if string.sub(str,1,3) == "cc." then
+		return oldRequire(libFolder.."."..str)
+	else
+		local success,response = pcall(oldRequire,libFolder.."."..str)
+		if success then
+			return response
+		else
+			return oldRequire(str)
+		end
+	end
+end]]
 
 --CONFIG
 local compat = {}
@@ -393,6 +493,10 @@ compat.makeRequire = function(...) return require, package end
 compat.version = "v0.3"
 compat.title = machine.title
 compat.setRPC = machine.setRPC
+compat.setLibFolder = function(new)
+	package.path = "./?.lua;./?/init.lua;"..new.."/?.lua;"..new.."/?/init.lua"
+	libFolder = new
+end
 compat.log = function(...)
 	oldPrint(...)
 end
@@ -407,6 +511,7 @@ for i,v in pairs(fakeGlobals) do
 	end
 end
 
+settings.load()
 machine.title("bios-wrapper "..compat.version)
 machine.setRPC("bios-wrapper "..compat.version, "")
 os.run({},"/.BIOS")
