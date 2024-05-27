@@ -452,39 +452,6 @@ fakeGlobals.wrap = function(str)
 	end	
 	return returnString
 end
-local oldDoFile = dofile
-local badFiles = {
-	["/rom/modules/main/cc/require.lua"] = true,
-	["/rom/modules/main/cc/require.lua"] = true,
-	["/rom/modules/main/cc/expect.lua"] = true,
-	["/rom/modules/main/cc/expect.lua"] = true,
-}
-fakeGlobals.dofile = function(file)
-	if badFiles[file] then
-		local fake = {}
-		fake.make = function(...)
-			return require, package
-		end
-		fake.expect = function(...) return end
-		fake.field = function(...) return end
-		return fake
-	else
-		return oldDoFile(file)
-	end
-end
-local oldRequire = require
---[[fakeGlobals.require = function(str)
-	if string.sub(str,1,3) == "cc." then
-		return oldRequire(libFolder.."."..str)
-	else
-		local success,response = pcall(oldRequire,libFolder.."."..str)
-		if success then
-			return response
-		else
-			return oldRequire(str)
-		end
-	end
-end]]
 
 --CONFIG
 local compat = {}
