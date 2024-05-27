@@ -55,6 +55,10 @@ file:write(makeJson({
             packageId = "package",
             version = b4.version,
         }
+		["bios-wrapper"] = {
+            packageId = "bios-wrapper",
+            version = c.packages["bios-wrapper"].version,
+        }
     }
 }))
 file:close()
