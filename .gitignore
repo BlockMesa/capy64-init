@@ -1,4 +1,6 @@
 *
+!lib
+lib/*
 !lib/bit.lua
 !lib/json.lua
 !.gitignore
