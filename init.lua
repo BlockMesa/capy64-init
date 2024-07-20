@@ -359,6 +359,10 @@ fakeGlobals.print = function(str)
 	oldPrint(str)
 	local chars = {}
 	local lines = {}
+	str = tostring(str)
+	if str == nil then
+		str = "nil"
+	end
 	for i in string.gmatch(str, ".") do
 		table.insert(chars, i)
 	end
