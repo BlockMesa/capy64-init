@@ -1,12 +1,20 @@
 --capy64 init
 --TODO: implement all basic CC functions BM-OS
 package.path = "./?.lua;./?/init.lua;/lib/?.lua;/lib/?/init.lua"
-local machine = require("machine")
-local event = require("event")
-local machine = require("machine")
-local timer = require("timer")
-local http = require("http")
-local json = require("json")
+local function shallowCopyRequire(name)
+	local a = {}
+	local b = require(name)
+	for i,v in pairs(b) do
+		a[i] = v
+	end
+	return a
+end
+local machine = shallowCopyRequire("machine")
+local event = shallowCopyRequire("event")
+local machine = shallowCopyRequire("machine")
+local timer = shallowCopyRequire("timer")
+local http = shallowCopyRequire("http")
+local json = shallowCopyRequire("json")
 local libFolder = "/lib"
 
 local blank = function(...) return end
@@ -132,7 +140,7 @@ local function blitTransform(ccBlit)
 	end
 	return newBlit
 end
-local fakeTerm = require("term")
+local fakeTerm = shallowCopyRequire("term")
 local sizeX,sizeY = fakeTerm.getSize()
 local oldBlit = fakeTerm.blit
 fakeTerm.native = function()
@@ -140,7 +148,7 @@ fakeTerm.native = function()
 end -- according to the CC code (and documentation) this is what term.native does when not multitasking, we dont really care about cc multitasking
 fakeTerm.redirect = function(new)
 	if not new then
-		error("New terminal required!",0)
+		error("New terminal shallowCopyRequired!",0)
 	end
 	local oldTerm = fakeTerm
 	fakeTerm = new
@@ -229,7 +237,7 @@ local makeWriteHandle = function(a)
 		close = function(...) return a:close(...) end,
 	}
 end
-local fakeFs = require("fs")
+local fakeFs = shallowCopyRequire("fs")
 local oldOpen = fakeFs.open
 fakeFs.open = function(file,mode)
 	if not readModes[mode] and not writeModes[mode] then
@@ -258,10 +266,7 @@ fakeFs.find = function(...) return {} end
 fakeGlobals.fs = fakeFs
 
 --SETTINGS
-local values = {
-	["bm-bios.firstBoot"] = true,
-	["bios.use_multishell"] = false
-}
+local values = {}
 local fakeSettings = {}
 fakeSettings.get = function(name)
 	return values[name]
@@ -341,8 +346,11 @@ fakeTextUtils.unserialiseJSON = json.decode
 fakeGlobals.textutils = fakeTextUtils
 
 --BIT32
-local fakeBit32 = require("lib.bit").bit32
+local fakeBit32 = shallowCopyRequire("lib.bit").bit32
 fakeGlobals.bit32 = fakeBit32
+--IO
+local fakeIo = shallowCopyRequire("fs")
+fakeGlobals.io = fakeIo
 --GLOBALS
 local oldPrint = print
 local writeLine = function(line)
@@ -458,14 +466,14 @@ fakeGlobals.wrap = function(str)
 end
 local oldDoFile = dofile
 local badFiles = {
-	["/rom/modules/main/cc/require.lua"] = true,
-	["/rom/modules/main/cc/require.lua"] = true
+	["/rom/modules/main/cc/shallowCopyRequire.lua"] = true,
+	["/rom/modules/main/cc/shallowCopyRequire.lua"] = true
 }
 fakeGlobals.dofile = function(file)
 	if badFiles[file] then
 		local fake = {}
 		fake.make = function(...)
-			return require, package
+			return shallowCopyRequire, package
 		end
 		fake.expect = function(...) return end
 		fake.field = function(...) return end

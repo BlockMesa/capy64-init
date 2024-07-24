@@ -16,6 +16,7 @@ print("Installing BM-OS")
 
 pcall(fs.delete,"home",true)
 pcall(fs.makeDir,"/home")
+pcall(fs.makeDir,"/boot")
 pcall(fs.makeDir,"/bin")
 pcall(fs.makeDir,"/sbin")
 pcall(fs.makeDir,"/etc")
