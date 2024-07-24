@@ -1,5 +1,5 @@
---capy64 BM-BIOS wrapper
---TODO: implement all basic CC functions BM-BIOS uses
+--capy64 init
+--TODO: implement all basic CC functions BM-OS
 package.path = "./?.lua;./?/init.lua;/lib/?.lua;/lib/?/init.lua"
 local machine = require("machine")
 local event = require("event")
@@ -193,7 +193,7 @@ local writeModes = {
 local makeReadHandle = function(a)
 	return {
 		readAll = function(...) return a:read("a") end,
-		readLine = function(...) return a:readLine("l") end,
+		readLine = function(...) return a:read("l") end,
 		read = function(...) return a:read(...) end,
 		close = function(...) return a:close(...) end,
 	}
@@ -475,22 +475,8 @@ fakeGlobals.dofile = function(file)
 	end
 end
 
-
+fakeGlobals.printError = fakeGlobals.print
 --CONFIG
-local compat = {}
-compat.isCapy64 = true
-compat.makeRequire = function(...) return require, package end
-compat.version = "v0.3"
-compat.title = machine.title
-compat.setRPC = machine.setRPC
-compat.setLibFolder = function(new)
-	package.path = "./?.lua;./?/init.lua;"..new.."/?.lua;"..new.."/?/init.lua"
-	libFolder = new
-end
-compat.log = function(...)
-	oldPrint(...)
-end
-fakeGlobals.compat = compat
 for i,v in pairs(fakeGlobals) do
 	if _G[i] and type(v) == "table" then
 		for i1,v in pairs(v) do
@@ -502,6 +488,6 @@ for i,v in pairs(fakeGlobals) do
 end
 
 settings.load()
-machine.title("bios-wrapper "..compat.version)
-machine.setRPC("bios-wrapper "..compat.version, "")
-os.run({},"/.BIOS")
+machine.title("BM-OS")
+machine.setRPC("BM-OS", "")
+os.run({},"/boot/loader.lua")

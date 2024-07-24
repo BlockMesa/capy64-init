@@ -5,66 +5,42 @@ local makeTable = json.decode
 local http = require("http")
 local fs = require("fs")
 local term = require("term")
-local a = http.get('https://notbronwyn.neocities.org/blockmesa/meta.json')
-local c = json.decode(a.content:read("a"))
+
+local a = http.get('https://windclan.neocities.org/blockmesa/meta.json')
+local json = a.content:read("a"):gsub("%G","")
+local c = makeTable(json)
 local b = c.packages.base
-local b1 = c.packages.kernel
-local b2 = c.packages.bootloader
-local b3 = c.packages.shell
-local b4 = c.packages.package
-local baseUrl = b.assetBase
-local baseUrl1 = b1.assetBase
-local baseUrl2 = b2.assetBase
-local baseUrl3 = b3.assetBase
-local baseUrl4 = b4.assetBase
-print("BM-OS WILL NOW BE INSTALLED.")
-fs.makeDir("/bin")
-fs.makeDir("/sbin")
-fs.makeDir("/etc")
-fs.makeDir("/usr")
-fs.makeDir("/lib")
-fs.makeDir("/usr/bin")
-fs.makeDir("/usr/lib")
-fs.makeDir("/usr/etc")
-fs.makeDir("/etc/packages.d")
-local file = fs.open("/etc/packages.d/packages.json","w")
-file:write(makeJson({
+
+print("Installing BM-OS")
+
+
+pcall(fs.delete,"home",true)
+pcall(fs.makeDir,"/home")
+pcall(fs.makeDir,"/bin")
+pcall(fs.makeDir,"/sbin")
+pcall(fs.makeDir,"/etc")
+pcall(fs.makeDir,"/usr")
+pcall(fs.makeDir,"/lib")
+pcall(fs.makeDir,"/usr/bin")
+pcall(fs.makeDir,"/usr/lib")
+pcall(fs.makeDir,"/usr/bin")
+pcall(fs.makeDir,"/usr/etc")
+
+local meta = {
     updated = "",
     installed = {
-        bios = {
-            packageId = "bios",
-            version = c.packages.bios.version,
-        },
         base = {
             packageId = "base",
             version = b.version,
+			requires = b.requires
         },
-        kernel = {
-            packageId = "kernel",
-            version = b1.version,
-        },
-        bootloader = {
-            packageId = "bootloader",
-            version = b2.version,
-        },
-        shell = {
-            packageId = "shell",
-            version = b3.version,
-        },
-        package = {
-            packageId = "package",
-            version = b4.version,
-        },
-		["bios-wrapper"] = {
-            packageId = "bios-wrapper",
-            version = c.packages["bios-wrapper"].version,
-        }
-    }
-}))
-file:close()
+    },
+	conflicts = {},
+	provided = {}
+}
 
-local function installFile(url,file)
-    local result, reason = http.get(url, nil, {binary = true}) --make names better
+local function installFile(file,url)
+    local result, reason = http.get(url,nil,{binary = true}) --make names better
     if not result then
         print(("Failed to update %s from %s (%s)"):format(file, url, reason)) --include more detail
         return
@@ -73,34 +49,54 @@ local function installFile(url,file)
     a1:write(result.content:read("a"))
     a1:close()
 end
-print("Installing kernel")
-for i,v in pairs(b1.files) do
-    installFile(baseUrl1..v,v)
+local function install(v)
+	print("Installing package "..v)
+	local files = {}
+	for i,v1 in pairs(c.packages[v].files) do
+		local url = v1
+		local file = ""
+		if type(i) == "string" then
+			file = i
+		else
+			file = v1
+		end
+		table.insert(files,file)
+		installFile(file,c.packages[v].assetBase..url)
+	end
+	meta.installed[v] = {
+        packageId = v,
+        version = c.packages[v].version,
+		requires = c.packages[v].requires,
+		files = files
+    }
+	meta.conflicts[v] = c.packages[v].conflicts or {}
+	meta.provided[v] = {v}
+	if c.packages[v].provides then
+		for _,v1 in pairs(c.packages[v].provides) do
+			table.insert(provided[v],v1)
+		end
+	end
 end
-print("Installing bootloader")
-for i,v in pairs(b2.files) do
-    installFile(baseUrl2..v,v)
+for i,v in pairs(b.requires) do
+	install(v)
 end
-print("Installing shell")
-for i,v in pairs(b3.files) do
-    installFile(baseUrl3..v,v)
+--install("capy64-init")
+
+pcall(fs.makeDir,"/etc/packages.d")
+local file = fs.open("/etc/packages.d/packages.json","w")
+file:write(makeJson(meta))
+file:close()
+
+local file = fs.open("/etc/hostname", "w")
+print("Please enter a hostname")
+term.write("hostname: ")
+local a = io.read()
+if not a or a == "" then
+	a = "computer"
 end
-print("Installing package manager")
-for i,v in pairs(c.packages["bios-wrapper"].files) do
-    installFile(c.packages["bios-wrapper"].assetBase..v,v)
-end
-print("Installing BIOS manager")
-for i,v in pairs(c.packages.bios.files) do
-    installFile(c.packages.bios.assetBase..v,v)
-end
-print("Installing package manager")
-for i,v in pairs(b4.files) do
-    installFile(baseUrl4..v,v)
-end
-print("Installing base commands")
-for i,v in pairs(b.files) do
-    installFile(baseUrl..v,v)
-end
-fs.delete("sys",true)
+file:write(a)
+file:close()
+
 print("Installation complete!")
+fs.delete("sys",true)
 machine.reboot()
